@@ -34,5 +34,15 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+
+
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kanji0405/yumemiFrontend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/kanji0405/yumemiFrontend/issues"
+  },
+  "homepage": "https://github.com/kanji0405/yumemiFrontend#readme"
 }
