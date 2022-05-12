@@ -1,25 +1,68 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { Component } from 'react';
+import { LineChart, Line, Data, XAxis, Tooltip, CartesianGrid } from 'recharts';
+let xApiKey = require('./X_API_KEY');
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+async function getAPI(name) {
+	return new Promise((resolve, reject) => {
+		try {
+			fetch('https://opendata.resas-portal.go.jp/' + name, {
+				headers: { 'X-API-KEY': xApiKey },
+			}).then((respond) => {
+				resolve(respond.json());
+			});
+		} catch (e) {
+			reject(null);
+		}
+	});
+}
+console.log(xApiKey)
+/*
+getAPI('api/v1/prefectures').then((json) => {
+	console.log(json.result);
+	//json.result.map(pref => { return <PrefButton>{pref}</PrefButton>; })
+});
+*/
+
+class PrefButton extends React.Component {
+	get _knsIsSelected() { return this.state.value; }
+	constructor(props) {
+		super(props);
+		this.state = { value: '' };
+		this._knsItem = this.props.children;
+		this._knsId = "pref" + this._knsItem.prefCode;
+	}
+	render() {
+		return (
+			<form>
+				<label>
+					<input type="checkbox" name="pref"
+						onChange={this.handleChange.bind(this)}
+						value={this._knsId}
+					/>{this._knsItem.prefName}
+				</label>
+			</form>
+		);
+	}
+	handleChange(event) {
+		this.setState({ value: event.target.value });
+	}
+}
+
+function App(){
+	return (
+		(<LineChart
+			width={400}
+			height={400}
+			data={200}
+			margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+		>
+			<XAxis dataKey="name" />
+			<Tooltip />
+			<CartesianGrid stroke="#f5f5f5" />
+			<Line type="monotone" dataKey="uv" stroke="#ff7300" yAxisId={0} />
+			<Line type="monotone" dataKey="pv" stroke="#387908" yAxisId={1} />
+		</LineChart>)
+	);
 }
 
 export default App;
