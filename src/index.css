@@ -11,3 +11,70 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+:root {
+  --light-background: rgb(235 248 255);
+  --dark-background: rgb(46 121 177);
+  --middle-background: rgb(142 164 210);
+  --dark-accent: rgb(64 58 127);
+}
+
+body{
+  background-size: cover;
+  background-color: var(--middle-background);
+  color: var(--dark-accent)
+}
+
+.poplModelArticle{
+  max-width: 900px;
+  margin: 24px auto 0;
+  background-color: var(--light-background);
+  border: 1px solid var(--dark-background);
+}
+
+.poplModelArticle h1{
+  background-color: var(--dark-background);
+  color: var(--light-background);
+  padding: 8px 5px;
+  margin: 0
+}
+
+.poplModelArticle h2{
+  margin: 2px 0;
+}
+
+.poplModelArticle recharts-wrapper{
+  width: 100%;
+}
+
+.poplModelPrefs label{
+  padding: 0 9px 0;
+  margin: 4px;
+  color: var(--light-background);
+  background-color: var(--dark-background);
+  border: 1px var(--dark-background) solid;
+  border-radius: 6px 0 / 6px 0;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.poplModelPrefs input[name='prefs']{
+  display: none;
+}
+
+.poplModelPrefs input[name='prefs']:checked + span{
+  color: gold;
+}
+
+.poplModelArticle .recharts-responsive-container{
+  display: block;
+  margin: 4px auto 20px;
+}
+
+@media only screen and (max-width: 600px){
+  .poplModelPrefs{
+    border: 1px solid var(--dark-background);
+    overflow-y: scroll;
+    height: 5em;
+  }
+}
