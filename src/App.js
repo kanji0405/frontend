@@ -1,95 +1,172 @@
 import React from 'react';
-import { LineChart, Line, Data, XAxis, Tooltip, CartesianGrid } from 'recharts';
+import { CartesianGrid, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend, } from 'recharts';
 import xApiKey from './X_API_KEY.json';
+import Strings from './Strings.json';
 
-async function getAPI(name) {
-	return new Promise((resolve, reject) => {
-		try {
-			fetch('https://opendata.resas-portal.go.jp/' + name, {
-				headers: { 'X-API-KEY': xApiKey.key },
-			}).then((res) => {
-				if (res.status == 200){
-					resolve(res.json());
-				}else{
-					throw '接続失敗';
-				}
-			});
-		} catch (e) {
-			reject(null);
-			throw e;
-		}
-	});
+//====================================================================================
+// static APIManager
+//====================================================================================
+// - RESAS APIを叩く静的クラスです
+//====================================================================================
+class APIManager{
+	static baseUrl = 'https://opendata.resas-portal.go.jp/api/';
+	static parseUrl(name){ return this.baseUrl + name; }
+	static getAPI(name) {
+		return new Promise((resolve, reject) => {
+			try {
+				fetch(this.parseUrl(name), { headers: { 'X-API-KEY': xApiKey.key }, }
+				).then((res) => {
+					if (res.status === 200){
+						resolve(res.json());
+					}else{
+						throw Error(Strings.ApiConnectionFailed);
+					}
+				});
+			} catch (e) {
+				reject(null);
+				throw e;
+			}
+		});
+	}
 }
 
-/*
-getAPI('api/v1/population/composition/perYear?cityCode=11362&prefCode=11').then((json) => {
-	console.log(json);
-});
-*/
+//====================================================================================
+// PrefWrapper
+//====================================================================================
+// - 都道府県ごとの選択状況、人口データの取得、レンダリング用のオブジェクトを
+//   生成するラッパークラスです
+//====================================================================================
+class PrefWrapper{
+	static ColorList = ['red', 'blue', 'green', 'purple', 'orange', 'gray'];
+	get id(){ return "key" + this.item.prefCode; }
+	get name(){ return this.item.prefName; }
+	get isChecked(){
+		const el = document.querySelector(`input[name='prefs'][value=${this.id}]`);
+		return el && el.checked === true;
+	}
+	constructor(parent, item){
+		this.parent = parent;
+		this.item = item;
+		this.population = null;
+	}
+	getPopulation(){
+		if (this.population === null){
+			APIManager.getAPI(
+				`v1/population/composition/perYear?cityCode=-&prefCode=${this.item.prefCode}`
+			).then(
+				(popl) => {
+					this.population = popl.result;
+					this.requestChange();
+				}
+			);
+		}
+		return this.population;
+	}
+	requestChange(){
+		this.parent._changeSelection();
+	}
+	renderCheckbox(){
+		return (
+			<label key={this.id + '_label'} draggable="false">
+				<input type="checkbox" name="prefs" onChange={this.requestChange.bind(this)} value={this.id}/>
+				{this.name}
+			</label>
+		);
+	}
+	renderLine(i){
+		return (
+			<Line
+				key={this.id + '_line'}
+				dataKey={this.id}
+				name={this.name}
+				stroke={PrefWrapper.ColorList[i % PrefWrapper.ColorList.length]}
+				type="monotone"
+			/>
+		);
+	}
+}
 
-export default class App extends React.Component{
+//====================================================================================
+// PopulationModel
+//====================================================================================
+// - ステートの管理、グラフデータのフォーマット、レンダリングを行う
+//   総合的なモデルクラスです
+//====================================================================================
+export default class PopulationModel extends React.Component{
 	static value;
 	constructor(props){
 		super(props);
-		this.prefs = [];
-		this.state = { dirty: false };
+		this.state = {
+			prefWrappers: [],
+			graphData: [],
+			selectedPrefs: []
+		};
 		this._changeSelection = this._onChange.bind(this);
 	}
 	componentDidMount(){
-		if (this.prefs.length > 0){
+		if (this.state.prefWrappers.length > 0){
 			return;
 		}
-		getAPI('api/v1/prefectures').then(async json => {
-			this.prefs = json.result.map(pref => new PrefWrapper(pref));
-			this.setState({dirty: true});
+		APIManager.getAPI('v1/prefectures').then(json => {
+			this.setState({
+				prefWrappers: json.result.map(pref => new PrefWrapper(this, pref))
+			});
 		});
 	}
 	_onChange(){
-		this.setState({dirty: false});
-		console.log('changed', this.prefs.length);
+		this.formatGraphData();
+	}
+	formatGraphData(){
+		const newGraph  = [];
+		const newSelect = [];
+		this.state.prefWrappers.forEach(pref=>{
+			if (pref.isChecked === false){
+				return;
+			}
+			const popl = pref.getPopulation();
+			if (popl === null){
+				return;
+			}
+			newSelect.push(pref);
+			popl.data[0].data.forEach((json) => {
+				const year = json.year;
+				let yearObject = newGraph.find(obj => obj.year === year);
+				if (yearObject === undefined){
+					yearObject = {year: year};
+					newGraph.push(yearObject);
+				}
+				yearObject[pref.id] = json.value;
+			});
+		});
+		newGraph.sort((a, b) => a.year - b.year);
+		this.setState({graphData: newGraph, selectedPrefs: newSelect});
 	}
 	render(){
 		return (
 			<div>
-				{ this.prefs.map(pref => pref.toStr(this._changeSelection)) }
-				<LineChart
-					width={400}
-					height={400}
-					data={200}
-					margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
-				>
-				<XAxis dataKey="name" />
-				<Tooltip />
-				<CartesianGrid stroke="#f5f5f5" />
-				<Line type="monotone" dataKey="uv" stroke="#ff7300" yAxisId={0} />
-				<Line type="monotone" dataKey="pv" stroke="#387908" yAxisId={1} />
-				</LineChart>
+				<h2>{Strings.Title}</h2>
+				{ this.state.prefWrappers.map(pref => pref.renderCheckbox()) }
+				<ResponsiveContainer width="100%" height={500}>
+					<LineChart
+						width='800' height='400' data={this.state.graphData}
+						margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
+					>
+					<CartesianGrid strokeDasharray="3 3" />
+					<XAxis 
+						dataKey="year"
+						domain={['dataMin', 'dataMax']}
+						label={{ value: Strings.LabelYear, offset: -5, position: "insideBottomRight" }}
+					/>
+					<YAxis
+						domain={['dataMin', 'dataMax']}
+						label={{ value: Strings.LabelPopulation, angle: -90, position: "insideLeft" }}
+					/>
+					<Tooltip />
+					<Legend verticalAlign="top" />
+					{ this.state.selectedPrefs.map((pref, i)=> pref.renderLine(i)) }
+					</LineChart>
+				</ResponsiveContainer>
 			</div>
 		);
-	}
-}
-
-class PrefWrapper{
-	constructor(item){
-		this.item = item;
-		this._isSelected = false;
-	}
-	toStr(onchange){
-		return (
-			<label key={this.id}>
-				<input type="checkbox" name="prefs"
-					onChange={onchange} value={id}
-				/>{this.name}
-			</label>
-		);
-	}
-	get isSelected(){
-		return this._isSelected;
-	}
-	get id(){
-		return "key" + this.item.prefCode;
-	}
-	get name(){
-		return this.item.prefName;
 	}
 }
